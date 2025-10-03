@@ -1,34 +1,44 @@
 # GaiaEye: AI-Powered Environmental Awareness System
 
-GaiaEye is a prototype AI system that demonstrates multimodal environmental monitoring by processing video, audio, and simulated sensor data to detect environmental changes, recognize wildlife sounds, and predict potential hazards. The system generates alerts and summaries in real-time.
+GaiaEye is a prototype AI system that demonstrates multimodal environmental monitoring by processing video, audio, and simulated sensor data to detect environmental changes, recognize wildlife sounds, and predict potential hazards.
 
 This prototype aims to showcase AI model integration across multiple modalities and the concept of correlating environmental data, suitable for academic demonstration, portfolio, and small-scale experiments.
 
 ## Features
 
-*   **Video Analysis:** Detects environmental objects and changes using a pre-trained YOLOv8 model.
-*   **Audio Analysis:** Classifies natural sounds using the pre-trained YAMNet audio classification model.
-*   **Sensor Correlation:** Predicts environmental hazards by detecting anomalies in simulated sensor data using an Isolation Forest model.
-*   **Alerts & Summaries:** Generates real-time textual alerts and a consolidated summary of the findings from all analysis modules.
+*   **Modular Analysis Pipelines:** The system is built on a modular architecture with distinct, class-based pipelines for video, audio, and sensor analysis, making it efficient and extensible.
+*   **Video Analysis:** Detects environmental objects using a pre-trained YOLOv8 model.
+*   **Audio Analysis:** Classifies sounds using the pre-trained YAMNet model from TensorFlow Hub.
+*   **Sensor Anomaly Detection:** Identifies anomalies in simulated sensor data using an Isolation Forest model.
+*   **Cross-Modal Correlation:** Generates high-confidence alerts by correlating findings from different data sources (e.g., detecting "fire" in both video and audio).
+*   **Centralized Configuration:** All system parameters, model paths, and thresholds are managed in a single `config.yaml` file for easy tuning.
 
 ## Project Structure
 
+The project follows a modular structure to separate concerns and improve maintainability.
+
 ```
 /
-├── data/             # Directory for sample video, audio, and CSV files
+├── data/                 # Sample video, audio, and sensor data
 │   ├── video/
 │   ├── audio/
 │   └── sensor/
-├── src/              # Main source code
-│   ├── video_analysis/
-│   ├── audio_analysis/
-│   ├── sensor_analysis/
-│   └── integration/
-├── main.py           # Main script to run the CLI application
-└── requirements.txt  # Python dependencies
+├── src/                  # Main source code
+│   ├── video_analysis/   # VideoAnalysisPipeline class
+│   ├── audio_analysis/   # AudioAnalysisPipeline class
+│   ├── sensor_analysis/  # SensorAnalysisPipeline class
+│   ├── integration/      # Reporting and correlation logic
+│   └── config.py         # Centralized configuration loader
+├── tests/                # Unit and integration tests
+├── main.py               # Main script to run the CLI application
+├── config.yaml           # Configuration file for the system
+├── requirements.txt      # Python dependencies for running the app
+└── requirements-dev.txt  # Additional dependencies for testing and development
 ```
 
 ## Setup
+
+Follow these steps to set up the project environment.
 
 1.  **Clone the repository:**
     ```bash
@@ -43,40 +53,49 @@ This prototype aims to showcase AI model integration across multiple modalities 
     ```
 
 3.  **Install the dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+    *   To run the application:
+        ```bash
+        pip install -r requirements.txt
+        ```
+    *   To run tests and contribute to development, install the development dependencies as well:
+        ```bash
+        pip install -r requirements-dev.txt
+        ```
 
 ## Usage
 
-The application is run from the command line using `main.py`. You can specify the paths to the video, audio, and sensor data files to be analyzed.
+The application is run from the command line using `main.py`. You can specify paths to the video, audio, and sensor data files you wish to analyze. The sample files in the `data/` directory can be used for a quick test run.
 
-**Example:**
-
+**Run a full analysis using all sample data:**
 ```bash
 python3 main.py --video data/video/test_video.mp4 --audio data/audio/white_noise.wav --sensor data/sensor/sensor_data.csv
 ```
 
-This will run all three analysis modules and print a consolidated report to the console, including any alerts generated from the analysis. You can also run each module individually by providing only the relevant argument (e.g., `--video <path_to_video>`).
+**Run only a single analysis module:**
+*   **Video only:**
+    ```bash
+    python3 main.py --video data/video/test_video.mp4
+    ```
+*   **Audio only:**
+    ```bash
+    python3 main.py --audio data/audio/sine_wave_1000hz.wav
+    ```
+
+The system will print a consolidated report to the console, including any alerts generated from the analysis.
 
 ## Testing
 
-The project includes a suite of unit tests to ensure the correctness of each module. The tests cover the video, audio, sensor, and integration modules.
+The project includes a suite of unit tests to ensure the correctness of each module.
 
-To run the tests, use the following command:
+1.  **Install development dependencies:**
+    ```bash
+    pip install -r requirements-dev.txt
+    ```
 
-```bash
-pytest
-```
-
-## Future Improvements
-
-*   **Real-time Data Streaming:** Instead of processing static files, the system could be enhanced to handle real-time data streams from cameras, microphones, and sensors.
-*   **Advanced Anomaly Detection:** The sensor data analysis could be improved with more sophisticated anomaly detection models, such as LSTMs or other deep learning models, to better capture temporal dependencies.
-*   **Scalability:** For larger-scale deployments, the system could be integrated with a message queue (like RabbitMQ or Kafka) and a distributed processing framework (like Spark or Dask) to handle a high volume of data from multiple sources.
-*   **Dashboard and Visualization:** A web-based dashboard could be developed to visualize the data, alerts, and analysis results in a more user-friendly way.
-*   **Model Retraining and Fine-tuning:** The AI models could be retrained or fine-tuned on custom datasets to improve their accuracy for specific environments or use cases.
-*   **Expanded Sound Library:** The audio analysis could be expanded to recognize a wider range of sounds, including specific types of wildlife, machinery, or other environmental indicators.
+2.  **Run the tests:**
+    ```bash
+    python3 -m pytest
+    ```
 
 ## License
 
