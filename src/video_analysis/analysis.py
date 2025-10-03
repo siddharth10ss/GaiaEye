@@ -2,115 +2,105 @@ import cv2
 from ultralytics import YOLO
 import os
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from tqdm import tqdm
+from src.config import config
 
-def analyze_video(video_path: str, config: Optional[Dict[Any, Any]] = None) -> Dict[str, float]:
+class VideoAnalysisPipeline:
     """
-    Analyzes a video to detect objects using YOLOv8 and returns a summary.
-
-    Args:
-        video_path (str): The path to the video file.
-        config (dict, optional): Configuration dictionary.
-
-    Returns:
-        dict: A dictionary of detected objects and their highest confidence scores.
+    A pipeline for analyzing video to detect objects using YOLOv8.
+    The model is loaded once during initialization for efficiency.
     """
-    if config is None:
-        config = {}
-    
-    # Get configuration values with defaults
-    model_path = config.get('models', {}).get('yolo', 'yolov8n.pt')
-    sample_rate = config.get('processing', {}).get('video_fps_sample', 1)
-    confidence_threshold = config.get('thresholds', {}).get('confidence_threshold', 0.5)
-    
-    try:
-        # Load the YOLOv8 model, suppressing verbose output
-        model = YOLO(model_path, verbose=False)
-        logging.info(f"Loaded YOLO model from {model_path}")
-    except Exception as e:
-        logging.error(f"Failed to load YOLO model: {e}")
-        return {}
+    def __init__(self):
+        """
+        Initializes the video analysis pipeline by loading the model and configuration.
+        """
+        video_config = config.get('video_analysis', {})
+        model_path = video_config.get('model_path', 'yolov8n.pt')
+        self.sample_rate = video_config.get('sample_rate', 1)
+        self.confidence_threshold = video_config.get('confidence_threshold', 0.5)
 
-    # Open the video file
-    cap = cv2.VideoCapture(video_path)
+        try:
+            self.model = YOLO(model_path, verbose=False)
+            logging.info(f"Loaded YOLO model from {model_path}")
+        except Exception as e:
+            logging.error(f"Failed to load YOLO model: {e}")
+            self.model = None
 
-    if not cap.isOpened():
-        logging.error(f"Error: Could not open video {video_path}")
-        return {}
+    def analyze(self, video_path: str) -> Dict[str, float]:
+        """
+        Analyzes a video to detect objects using the pre-loaded YOLOv8 model.
 
-    # Get video properties
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    
-    logging.info(f"Processing video: {video_path}")
-    logging.info(f"Total frames: {total_frames}, FPS: {fps}")
-    
-    detected_objects = {}
-    frame_count = 0
+        Args:
+            video_path (str): The path to the video file.
 
-    # Initialize progress bar
-    pbar = tqdm(total=total_frames, desc="Processing video frames", unit="frames")
+        Returns:
+            dict: A dictionary of detected objects and their highest confidence scores.
+        """
+        if not self.model:
+            logging.error("YOLO model is not loaded. Cannot analyze video.")
+            return {}
 
-    # Loop through the video frames
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            logging.error(f"Error: Could not open video {video_path}")
+            return {}
 
-        # Process frame based on sampling rate
-        if frame_count % sample_rate == 0:
-            try:
-                # Run YOLOv8 inference on the frame
-                results = model(frame)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        logging.info(f"Processing video: {video_path} ({total_frames} frames)")
 
-                # Process detected objects
-                for result in results:
-                    boxes = result.boxes
-                    for box in boxes:
-                        class_id = int(box.cls[0].item())
-                        class_name = model.names[class_id]
-                        confidence = float(box.conf[0].item())
-                        
-                        # Only consider detections above confidence threshold
-                        if confidence >= confidence_threshold:
-                            # Store the highest confidence for each object class
-                            if class_name not in detected_objects or confidence > detected_objects[class_name]:
-                                detected_objects[class_name] = confidence
-            except Exception as e:
-                logging.warning(f"Error processing frame {frame_count}: {e}")
+        detected_objects = {}
+        frame_count = 0
+        pbar = tqdm(total=total_frames, desc="Processing video frames", unit="frames")
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_count % self.sample_rate == 0:
+                try:
+                    results = self.model(frame)
+                    for result in results:
+                        boxes = result.boxes
+                        for box in boxes:
+                            class_id = int(box.cls[0].item())
+                            class_name = self.model.names[class_id]
+                            confidence = float(box.conf[0].item())
+
+                            if confidence >= self.confidence_threshold:
+                                if class_name not in detected_objects or confidence > detected_objects[class_name]:
+                                    detected_objects[class_name] = confidence
+                except Exception as e:
+                    logging.warning(f"Error processing frame {frame_count}: {e}")
+
+            frame_count += 1
+            pbar.update(1)
+
+        cap.release()
+        pbar.close()
         
-        frame_count += 1
-        pbar.update(1)
-
-    # Release the video capture object
-    cap.release()
-    pbar.close()
-    
-    logging.info(f"Video analysis complete. Detected {len(detected_objects)} object types.")
-    
-    return detected_objects
+        logging.info(f"Video analysis complete. Detected {len(detected_objects)} object types.")
+        return detected_objects
 
 if __name__ == '__main__':
     # This part is for direct testing of the script.
     # It assumes the script is run from the root of the project.
-    import yaml
-    
-    # Load config for testing
-    try:
-        with open('config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-    except:
-        config = {}
     
     test_video_path = 'data/video/test_video.mp4'
+
     if not os.path.exists(test_video_path):
         print(f"Error: Test video not found at {test_video_path}")
     else:
-        video_results = analyze_video(test_video_path, config)
-        print("--- Video Analysis Results ---")
-        if video_results:
-            for obj, conf in video_results.items():
-                print(f"- Detected: {obj} with confidence {conf:.2f}")
+        # Instantiate the pipeline and run the analysis
+        video_pipeline = VideoAnalysisPipeline()
+        if video_pipeline.model:
+            video_results = video_pipeline.analyze(test_video_path)
+            print("--- Video Analysis Results ---")
+            if video_results:
+                for obj, conf in video_results.items():
+                    print(f"- Detected: {obj} with confidence {conf:.2f}")
+            else:
+                print("No objects detected.")
         else:
-            print("No objects detected.")
+            print("Could not run video analysis due to model loading failure.")

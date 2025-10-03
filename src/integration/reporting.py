@@ -1,12 +1,12 @@
 import pandas as pd
 import logging
 from typing import Dict, Any, Optional, List
+from src.config import config
 
 def generate_consolidated_report(
     video_results: Dict[str, float], 
     audio_results: Dict[str, float], 
-    sensor_anomalies: Optional[pd.DataFrame],
-    config: Optional[Dict[Any, Any]] = None
+    sensor_anomalies: Optional[pd.DataFrame]
 ) -> str:
     """
     Generates a consolidated report from the analysis of video, audio, and sensor data.
@@ -15,18 +15,15 @@ def generate_consolidated_report(
         video_results (dict): A dictionary of detected objects from video analysis.
         audio_results (dict): A dictionary of detected sounds from audio analysis.
         sensor_anomalies (pd.DataFrame or None): A DataFrame of detected sensor anomalies.
-        config (dict, optional): Configuration dictionary.
 
     Returns:
         str: Formatted report string.
     """
-    if config is None:
-        config = {}
-    
     # Get threshold values from config
-    temp_threshold = config.get('thresholds', {}).get('temperature_alert', 40.0)
-    humidity_threshold = config.get('thresholds', {}).get('humidity_alert', 80.0)
-    air_quality_threshold = config.get('thresholds', {}).get('air_quality_alert', 50.0)
+    thresholds_config = config.get('thresholds', {})
+    temp_threshold = thresholds_config.get('temperature_alert', 40.0)
+    humidity_threshold = thresholds_config.get('humidity_alert', 80.0)
+    air_quality_threshold = thresholds_config.get('air_quality_alert', 50.0)
     
     report = "--- GaiaEye Consolidated Environmental Report ---\n\n"
 
@@ -89,8 +86,7 @@ def generate_consolidated_report(
 def correlate_multimodal_data(
     video_results: Dict[str, float], 
     audio_results: Dict[str, float], 
-    sensor_anomalies: Optional[pd.DataFrame],
-    config: Optional[Dict[Any, Any]] = None
+    sensor_anomalies: Optional[pd.DataFrame]
 ) -> List[str]:
     """
     Performs cross-modal correlation to identify complex environmental events.
@@ -99,14 +95,10 @@ def correlate_multimodal_data(
         video_results (dict): Detected objects from video analysis.
         audio_results (dict): Detected sounds from audio analysis.
         sensor_anomalies (pd.DataFrame or None): Sensor anomalies.
-        config (dict, optional): Configuration dictionary.
         
     Returns:
         list: List of correlated alerts.
     """
-    if config is None:
-        config = {}
-    
     correlated_alerts = []
     
     # Get correlation rules from config
@@ -126,9 +118,10 @@ def correlate_multimodal_data(
         
         sensor_match = False
         if sensor_anomalies is not None and not sensor_anomalies.empty:
+            thresholds_config = config.get('thresholds', {})
             sensor_match = any(
                 anomaly_type in sensor_anomalies.columns and 
-                sensor_anomalies[anomaly_type].max() > config.get('thresholds', {}).get(f'{anomaly_type}_alert', 0)
+                sensor_anomalies[anomaly_type].max() > thresholds_config.get(f'{anomaly_type}_alert', 0)
                 for anomaly_type in sensor_anomalies_list
             )
         
@@ -191,16 +184,10 @@ if __name__ == '__main__':
         'anomaly': [-1]
     })
     
-    # Load config for testing
-    import yaml
-    try:
-        with open('config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-    except:
-        config = {}
+    # The config is now loaded from src.config
     
-    report = generate_consolidated_report(video_results, audio_results, sensor_anomalies, config)
-    correlated_alerts = correlate_multimodal_data(video_results, audio_results, sensor_anomalies, config)
+    report = generate_consolidated_report(video_results, audio_results, sensor_anomalies)
+    correlated_alerts = correlate_multimodal_data(video_results, audio_results, sensor_anomalies)
     
     print(report)
     if correlated_alerts:

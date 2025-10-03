@@ -1,87 +1,75 @@
 import pytest
-import pandas as pd
 import numpy as np
 import os
-import sys
 from unittest.mock import patch, MagicMock
 
-# Add the src directory to the path
+from src.video_analysis.analysis import VideoAnalysisPipeline
 
+@pytest.fixture
+def mock_config():
+    """Fixture to mock the centralized config."""
+    with patch('src.video_analysis.analysis.config', {
+        'video_analysis': {
+            'model_path': 'yolov8n.pt',
+            'sample_rate': 1,
+            'confidence_threshold': 0.5
+        }
+    }) as mock_cfg:
+        yield mock_cfg
 
-from src.video_analysis.analysis import analyze_video
-
-def test_analyze_video_with_valid_input():
-    """Test video analysis with valid input."""
-    # Mock the YOLO model and cv2.VideoCapture
+def test_analyze_video_with_valid_input(mock_config):
+    """Test video analysis with valid input using the new pipeline."""
     with patch('src.video_analysis.analysis.YOLO') as mock_yolo, \
          patch('src.video_analysis.analysis.cv2.VideoCapture') as mock_video_capture:
         
-        # Mock the video capture object
-        mock_cap = MagicMock()
-        mock_video_capture.return_value = mock_cap
-        mock_cap.isOpened.return_value = True
-        mock_cap.read.side_effect = [
-            (True, np.zeros((480, 640, 3), dtype=np.uint8)),  # First frame
-            (True, np.zeros((480, 640, 3), dtype=np.uint8)),  # Second frame
-            (False, None)  # End of video
-        ]
-        # Mock get to return frame count and fps
-        mock_cap.get.side_effect = lambda prop: {
-            7: 3,  # CV_CAP_PROP_FRAME_COUNT
-            5: 30.0  # CV_CAP_PROP_FPS
-        }.get(prop, 0)
+        # Mock the YOLO model instance created in the pipeline's __init__
+        mock_model_instance = MagicMock()
+        mock_model_instance.names = {0: 'person'}
+        mock_yolo.return_value = mock_model_instance
         
-        # Mock the YOLO model instance
-        mock_model = MagicMock()
-        mock_yolo.return_value = mock_model
-
-        # Mock the model attributes and inference results
-        mock_model.names = {0: 'person'}
-
-        # Mock the results
-        mock_boxes = MagicMock()
-        mock_boxes.cls = [np.array([0])]  # class id
-        mock_boxes.conf = [np.array([0.9])]  # confidence
+        # Mock the inference results to be iterable
+        mock_box = MagicMock()
+        # ultralytics results have .cls and .conf as tensors. .item() extracts the value.
+        mock_box.cls = [MagicMock(item=MagicMock(return_value=0))]
+        mock_box.conf = [MagicMock(item=MagicMock(return_value=0.9))]
 
         mock_result = MagicMock()
-        mock_result.boxes = [mock_boxes]
+        mock_result.boxes = [mock_box]  # boxes is an iterable of box objects
+        mock_model_instance.return_value = [mock_result]
 
-        # Mock the model inference call
-        mock_model.return_value = [mock_result]
+        # Mock the video capture object
+        mock_cap_instance = MagicMock()
+        mock_cap_instance.isOpened.return_value = True
+        mock_cap_instance.read.side_effect = [
+            (True, np.zeros((480, 640, 3), dtype=np.uint8)),
+            (False, None)
+        ]
+        mock_cap_instance.get.return_value = 1 # Mock frame count
+        mock_video_capture.return_value = mock_cap_instance
         
-        # Test the function with sample rate of 1 to ensure processing
-        config = {'models': {'yolo': 'yolov8n.pt'}, 'processing': {'video_fps_sample': 1}}
-        results = analyze_video('test_video.mp4', config)
+        # Instantiate the pipeline, which will use the mocked YOLO model
+        video_pipeline = VideoAnalysisPipeline()
+
+        # Run the analysis
+        results = video_pipeline.analyze('dummy_video.mp4')
         
         # Assertions
-        assert isinstance(results, dict)
+        assert video_pipeline.model is not None
         assert 'person' in results
         assert results['person'] == 0.9
+        mock_yolo.assert_called_with('yolov8n.pt', verbose=False)
 
-def test_analyze_video_with_invalid_file():
-    """Test video analysis with invalid file path."""
-    config = {'models': {'yolo': 'yolov8n.pt'}}
-    results = analyze_video('nonexistent_video.mp4', config)
-    assert isinstance(results, dict)
-    assert len(results) == 0
+def test_analyze_video_with_invalid_file(mock_config):
+    """Test video analysis with an invalid file path."""
+    with patch('src.video_analysis.analysis.YOLO'): # Still need to patch model loading
+        video_pipeline = VideoAnalysisPipeline()
+        results = video_pipeline.analyze('nonexistent_video.mp4')
+        assert results == {}
 
-def test_analyze_video_with_empty_config():
-    """Test video analysis with empty config."""
-    with patch('src.video_analysis.analysis.YOLO') as mock_yolo, \
-         patch('src.video_analysis.analysis.cv2.VideoCapture') as mock_video_capture:
-        
-        # Mock the video capture object
-        mock_cap = MagicMock()
-        mock_video_capture.return_value = mock_cap
-        mock_cap.isOpened.return_value = True
-        mock_cap.read.return_value = (False, None)  # Empty video
-        
-        # Mock the YOLO model
-        mock_model = MagicMock()
-        mock_yolo.return_value = mock_model
-        
-        # Test the function
-        results = analyze_video('test_video.mp4', {})
-        
-        # Assertions
-        assert isinstance(results, dict)
+def test_video_pipeline_model_loading_failure():
+    """Test that analysis is skipped if the model fails to load."""
+    with patch('src.video_analysis.analysis.YOLO', side_effect=Exception("Model load error")):
+        video_pipeline = VideoAnalysisPipeline()
+        assert video_pipeline.model is None
+        results = video_pipeline.analyze('dummy_video.mp4')
+        assert results == {}
