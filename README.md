@@ -58,3 +58,26 @@ python3 main.py --video data/video/test_video.mp4 --audio data/audio/white_noise
 ```
 
 This will run all three analysis modules and print a consolidated report to the console, including any alerts generated from the analysis. You can also run each module individually by providing only the relevant argument (e.g., `--video <path_to_video>`).
+
+## Testing
+
+The project includes a suite of unit tests to ensure the correctness of each module. The tests cover the video, audio, sensor, and integration modules.
+
+To run the tests, use the following command:
+
+```bash
+pytest
+```
+
+## Future Improvements
+
+*   **Real-time Data Streaming:** Instead of processing static files, the system could be enhanced to handle real-time data streams from cameras, microphones, and sensors.
+*   **Advanced Anomaly Detection:** The sensor data analysis could be improved with more sophisticated anomaly detection models, such as LSTMs or other deep learning models, to better capture temporal dependencies.
+*   **Scalability:** For larger-scale deployments, the system could be integrated with a message queue (like RabbitMQ or Kafka) and a distributed processing framework (like Spark or Dask) to handle a high volume of data from multiple sources.
+*   **Dashboard and Visualization:** A web-based dashboard could be developed to visualize the data, alerts, and analysis results in a more user-friendly way.
+*   **Model Retraining and Fine-tuning:** The AI models could be retrained or fine-tuned on custom datasets to improve their accuracy for specific environments or use cases.
+*   **Expanded Sound Library:** The audio analysis could be expanded to recognize a wider range of sounds, including specific types of wildlife, machinery, or other environmental indicators.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
