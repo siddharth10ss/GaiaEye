@@ -22,6 +22,10 @@ def sample_sensor_anomalies():
     return pd.DataFrame(data)
 
 @pytest.fixture
+def no_sensor_anomalies():
+    return pd.DataFrame()
+
+@pytest.fixture
 def sample_config():
     return {
         'thresholds': {
@@ -37,6 +41,13 @@ def sample_config():
                     'sensor_anomalies': ['temperature'],
                     'confidence_threshold': 0.8
                 }
+            ],
+            'wildlife_detection': [
+                {
+                    'video_objects': ['animal'],
+                    'audio_sounds': ['animal sound'],
+                    'confidence_threshold': 0.7
+                }
             ]
         }
     }
@@ -51,6 +62,22 @@ def test_generate_consolidated_report(sample_video_results, sample_audio_results
     assert "CONSOLIDATED ALERTS" in report
     assert "[HIGH PRIORITY] Potential Fire Risk" in report
 
+def test_generate_consolidated_report_no_video(sample_audio_results, sample_sensor_anomalies, sample_config):
+    """Test report generation with no video results."""
+    report = generate_consolidated_report({}, sample_audio_results, sample_sensor_anomalies, sample_config)
+    assert "No significant objects detected." in report
+
+def test_generate_consolidated_report_no_audio(sample_video_results, sample_sensor_anomalies, sample_config):
+    """Test report generation with no audio results."""
+    report = generate_consolidated_report(sample_video_results, {}, sample_sensor_anomalies, sample_config)
+    assert "No significant sounds detected." in report
+
+def test_generate_consolidated_report_no_sensor_anomalies(sample_video_results, sample_audio_results, no_sensor_anomalies, sample_config):
+    """Test report generation with no sensor anomalies."""
+    report = generate_consolidated_report(sample_video_results, sample_audio_results, no_sensor_anomalies, sample_config)
+    assert "No anomalies detected in sensor data." in report
+    assert "All systems normal. No alerts to report." in report
+
 def test_correlate_multimodal_data(sample_video_results, sample_audio_results, sample_sensor_anomalies, sample_config):
     """Test the cross-modal data correlation."""
     alerts = correlate_multimodal_data(sample_video_results, sample_audio_results, sample_sensor_anomalies, sample_config)
@@ -58,3 +85,32 @@ def test_correlate_multimodal_data(sample_video_results, sample_audio_results, s
     assert isinstance(alerts, list)
     assert len(alerts) > 0
     assert "[HIGH CONFIDENCE CORRELATED ALERT]" in alerts[0]
+
+def test_correlate_multimodal_data_no_video_match(sample_audio_results, sample_sensor_anomalies, sample_config):
+    """Test correlation with no video match."""
+    alerts = correlate_multimodal_data({}, sample_audio_results, sample_sensor_anomalies, sample_config)
+    assert len(alerts) == 0
+
+def test_correlate_multimodal_data_no_audio_match(sample_video_results, sample_sensor_anomalies, sample_config):
+    """Test correlation with no audio match."""
+    alerts = correlate_multimodal_data(sample_video_results, {}, sample_sensor_anomalies, sample_config)
+    assert len(alerts) == 0
+
+def test_correlate_multimodal_data_no_sensor_match(sample_video_results, sample_audio_results, no_sensor_anomalies, sample_config):
+    """Test correlation with no sensor match."""
+    alerts = correlate_multimodal_data(sample_video_results, sample_audio_results, no_sensor_anomalies, sample_config)
+    assert len(alerts) == 0
+
+def test_correlate_multimodal_data_low_confidence(sample_video_results, sample_audio_results, sample_sensor_anomalies, sample_config):
+    """Test correlation with low confidence."""
+    low_conf_video = {'fire': 0.5, 'smoke': 0.4}
+    alerts = correlate_multimodal_data(low_conf_video, sample_audio_results, sample_sensor_anomalies, sample_config)
+    assert len(alerts) == 0
+
+def test_correlate_wildlife_detection(sample_config):
+    """Test wildlife detection correlation."""
+    video_results = {'animal': 0.8}
+    audio_results = {'animal sound': 0.75}
+    alerts = correlate_multimodal_data(video_results, audio_results, None, sample_config)
+    assert len(alerts) > 0
+    assert "[CORRELATED ALERT] Wildlife activity detected" in alerts[0]
