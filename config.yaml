@@ -1,0 +1,41 @@
+# GaiaEye Configuration File
+
+models:
+  yolo: yolov8n.pt
+  yamnet_url: https://tfhub.dev/google/yamnet/1
+
+processing:
+  video_fps_sample: 5  # Process 1 frame every 5 frames
+  audio_chunk_size: 30  # Process audio in 30-second chunks
+  max_video_duration: 3600  # Maximum video duration in seconds (1 hour)
+
+thresholds:
+  temperature_alert: 40.0  # Temperature threshold for fire risk alert (°C)
+  humidity_alert: 80.0     # Humidity threshold for high humidity alert (%)
+  air_quality_alert: 50.0  # Air quality threshold for poor air quality alert
+  contamination_rate: 0.1  # Contamination rate for Isolation Forest
+  confidence_threshold: 0.5  # Minimum confidence for video object detection
+  audio_score_threshold: 0.3  # Minimum score for audio classification
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: gaiaeye.log
+
+correlation:
+  # Cross-modal correlation weights
+  video_weight: 0.4
+  audio_weight: 0.3
+  sensor_weight: 0.3
+  
+  # Correlation rules
+  fire_detection:
+    - video_objects: ["fire", "smoke"]
+      audio_sounds: ["Fire alarm", "Fire"]
+      sensor_anomalies: ["temperature"]
+      confidence_threshold: 0.8
+      
+  wildlife_detection:
+    - video_objects: ["bird", "cat", "dog", "bear", "elephant"]
+      audio_sounds: ["Bird", "Cat", "Dog", "Bear", "Elephant"]
+      confidence_threshold: 0.7
